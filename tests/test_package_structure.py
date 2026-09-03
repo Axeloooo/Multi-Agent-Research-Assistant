@@ -10,7 +10,7 @@ def test_importing_main_does_not_run_pipeline(
 ) -> None:
     calls: list[str] = []
     fake_pipeline = ModuleType("src.pipelines.pipeline")
-    fake_pipeline.run_reseaerch_pipeline = lambda topic: calls.append(topic)
+    fake_pipeline.run_research_pipeline = lambda topic: calls.append(topic)
     monkeypatch.setitem(sys.modules, "src.pipelines.pipeline", fake_pipeline)
     sys.modules.pop("main", None)
 

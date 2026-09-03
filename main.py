@@ -1,10 +1,10 @@
-topic: str = "The impact of AI on the canadian job market in 2026"
+topic: str = "The impact of AI on the Canadian job market in 2026"
 
 
 def main() -> None:
-    from src.pipelines.pipeline import run_reseaerch_pipeline
+    from src.pipelines.pipeline import run_research_pipeline
 
-    run_reseaerch_pipeline(topic)
+    run_research_pipeline(topic)
 
 
 if __name__ == "__main__":

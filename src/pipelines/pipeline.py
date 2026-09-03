@@ -17,7 +17,7 @@ AgentGraph: TypeAlias = CompiledStateGraph[
 ]
 
 
-def run_reseaerch_pipeline(topic: str) -> Dict:
+def run_research_pipeline(topic: str) -> Dict:
     state: Dict[str, str] = {}
 
     # step 1 - search agent
@@ -36,7 +36,9 @@ def run_reseaerch_pipeline(topic: str) -> Dict:
             ]
         }
     )
-    state["search_results"] = search_result["messages"][-1].content
+    state["search_results"] = "\n\n".join(
+        str(message.content) for message in search_result["messages"]
+    )
 
     print("\n search result ", state["search_results"])
 
@@ -53,7 +55,7 @@ def run_reseaerch_pipeline(topic: str) -> Dict:
                     "user",
                     f"Based on the following search results about '{topic}', "
                     f"pick the most relevant URL and scrape it for deeper content.\n\n"
-                    f"Search Results:\n{state['search_results'][:800]}",
+                    f"Search Results:\n{state['search_results']}",
                 )
             ]
         }
