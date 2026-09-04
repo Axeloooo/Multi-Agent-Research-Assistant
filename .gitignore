@@ -151,6 +151,7 @@ activemq-data/
 .env
 .envrc
 .venv
+backend/.venv/
 env/
 venv/
 ENV/
@@ -211,5 +212,9 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Streamlit
-.streamlit/secrets.toml
+# Frontend build and test artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/playwright-report/
+frontend/storybook-static/
+frontend/test-results/

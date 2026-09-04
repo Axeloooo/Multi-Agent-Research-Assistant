@@ -1,0 +1,16 @@
+langchain
+langchain-core
+langchain-community
+langchain_google_genai
+
+tavily-python
+
+beautifulsoup4
+readability-lxml
+trafilatura
+requests
+lxml
+python-dotenv
+
+fastapi
+uvicorn[standard]
