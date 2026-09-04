@@ -8,7 +8,7 @@ from typing import Any
 
 from langchain_core.callbacks import BaseCallbackHandler
 
-from research_assistant.pipelines.events import (
+from backend.src.pipelines.events import (
     ActivityKind,
     AgentName,
     PipelineEvent,
@@ -139,7 +139,7 @@ def _activity(agent: AgentName, kind: ActivityKind) -> PipelineEvent:
 
 def _default_dependencies() -> PipelineDependencies:
     """Create production stage runners lazily to avoid credential work on import."""
-    from research_assistant.agents.agents import (
+    from backend.src.agents.agents import (
         build_critic_chain,
         build_reader_agent,
         build_search_agent,

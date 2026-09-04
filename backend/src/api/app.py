@@ -10,13 +10,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
 
-from research_assistant.api.registry import (
+from backend.src.api.registry import (
     PipelineFactory,
     RunRegistry,
     TERMINAL_STATUSES,
 )
-from research_assistant.pipelines.events import PipelineEvent
-from research_assistant.pipelines.pipeline import stream_research_pipeline
+from backend.src.pipelines.events import PipelineEvent
+from backend.src.pipelines.pipeline import stream_research_pipeline
 
 
 class StartRunRequest(BaseModel):
