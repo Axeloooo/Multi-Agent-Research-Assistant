@@ -31,7 +31,9 @@ def web_search(query: str) -> str:
     Returns:
         A formatted list of titles, URLs, and content snippets.
     """
-    results: dict[str, Any] = _get_tavily_client().search(query=query, max_results=5)
+    results: dict[str, Any] = _get_tavily_client().search(
+        query=query, max_results=5, timeout=30
+    )
 
     out: list[str] = []
 

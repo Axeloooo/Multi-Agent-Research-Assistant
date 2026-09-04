@@ -3,9 +3,17 @@
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
+from threading import Lock
 from typing import Any
 
-from research_assistant.pipelines.events import AgentName, PipelineEvent, PipelineResult
+from langchain_core.callbacks import BaseCallbackHandler
+
+from research_assistant.pipelines.events import (
+    ActivityKind,
+    AgentName,
+    PipelineEvent,
+    PipelineResult,
+)
 
 SearchStage = Callable[[str], Awaitable[str]]
 ReaderStage = Callable[[str, str], Awaitable[str]]
@@ -18,6 +26,65 @@ class PipelineCancelled(Exception):
     """Raised internally when a caller requests cooperative cancellation."""
 
 
+class PipelineStageTimedOut(Exception):
+    """Raised when a stage exceeds its bounded runtime."""
+
+
+@dataclass(frozen=True)
+class PipelineTimeouts:
+    """Maximum time each agent may occupy a research run, in seconds."""
+
+    search: float = 45
+    reader: float = 45
+    writer: float = 90
+    critic: float = 45
+
+
+class _ActivityEmitter:
+    """Bridge provider lifecycle callbacks into the pipeline event loop."""
+
+    def __init__(self) -> None:
+        self._loop = asyncio.get_running_loop()
+        self.queue: asyncio.Queue[PipelineEvent] = asyncio.Queue()
+        self._lock = Lock()
+        self._pending_callbacks = 0
+
+    def publish(self, agent: AgentName, kind: ActivityKind) -> None:
+        with self._lock:
+            self._pending_callbacks += 1
+
+        def deliver() -> None:
+            self.queue.put_nowait(_activity(agent, kind))
+            with self._lock:
+                self._pending_callbacks -= 1
+
+        self._loop.call_soon_threadsafe(
+            deliver,
+        )
+
+    def callback(self, agent: AgentName) -> "_ToolActivityCallback":
+        return _ToolActivityCallback(self, agent)
+
+    @property
+    def has_pending_callbacks(self) -> bool:
+        with self._lock:
+            return self._pending_callbacks > 0
+
+
+class _ToolActivityCallback(BaseCallbackHandler):
+    """Emit fixed, non-sensitive labels for LangChain tool lifecycle events."""
+
+    def __init__(self, emitter: _ActivityEmitter, agent: AgentName) -> None:
+        self._emitter = emitter
+        self._agent = agent
+
+    def on_tool_start(self, *args: Any, **kwargs: Any) -> None:
+        self._emitter.publish(self._agent, "using_tool")
+
+    def on_tool_end(self, *args: Any, **kwargs: Any) -> None:
+        self._emitter.publish(self._agent, "observing")
+
+
 @dataclass(frozen=True)
 class PipelineDependencies:
     """Stage runners injected by tests or supplied by the default application."""
@@ -26,6 +93,7 @@ class PipelineDependencies:
     reader: ReaderStage
     writer: WriterStage
     critic: CriticStage
+    activity: _ActivityEmitter | None = None
 
 
 def _message_text(message: Any) -> str:
@@ -55,6 +123,20 @@ def _status(agent: AgentName, status: str) -> PipelineEvent:
     )
 
 
+def _activity(agent: AgentName, kind: ActivityKind) -> PipelineEvent:
+    labels: dict[ActivityKind, str] = {
+        "thinking": "Thinking",
+        "using_tool": "Using tool",
+        "observing": "Observing tool result",
+        "streaming": "Streaming response",
+    }
+    return PipelineEvent(
+        type="agent.activity",
+        agent=agent,
+        payload={"kind": kind, "label": labels[kind]},
+    )
+
+
 def _default_dependencies() -> PipelineDependencies:
     """Create production stage runners lazily to avoid credential work on import."""
     from research_assistant.agents.agents import (
@@ -63,6 +145,8 @@ def _default_dependencies() -> PipelineDependencies:
         build_search_agent,
         build_writer_chain,
     )
+
+    activity = _ActivityEmitter()
 
     async def search(topic: str) -> str:
         agent = build_search_agent()
@@ -73,6 +157,7 @@ def _default_dependencies() -> PipelineDependencies:
                     ("user", f"Find recent, reliable information about: {topic}")
                 ]
             },
+            config={"callbacks": [activity.callback("search")]},
         )
         return _message_text(result["messages"][-1])
 
@@ -93,6 +178,7 @@ def _default_dependencies() -> PipelineDependencies:
                     )
                 ]
             },
+            config={"callbacks": [activity.callback("reader")]},
         )
         return _message_text(result["messages"][-1])
 
@@ -107,7 +193,7 @@ def _default_dependencies() -> PipelineDependencies:
             yield str(chunk)
 
     return PipelineDependencies(
-        search=search, reader=reader, writer=writer, critic=critic
+        search=search, reader=reader, writer=writer, critic=critic, activity=activity
     )
 
 
@@ -116,10 +202,76 @@ def _raise_if_cancelled(cancellation_event: asyncio.Event | None) -> None:
         raise PipelineCancelled
 
 
+async def _stream_stage_activity(
+    awaitable: Awaitable[str],
+    timeout: float,
+    activity: _ActivityEmitter | None,
+    result: list[str],
+) -> AsyncIterator[PipelineEvent]:
+    """Wait for a stage while relaying provider activity and enforcing its deadline."""
+    task = asyncio.ensure_future(awaitable)
+    activity_task = (
+        asyncio.create_task(activity.queue.get()) if activity is not None else None
+    )
+    deadline = asyncio.get_running_loop().time() + timeout
+
+    try:
+        while not task.done():
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise PipelineStageTimedOut
+            waiters: set[asyncio.Future[Any]] = {task}
+            if activity_task is not None:
+                waiters.add(activity_task)
+            done, _ = await asyncio.wait(
+                waiters, timeout=remaining, return_when=asyncio.FIRST_COMPLETED
+            )
+            if not done:
+                raise PipelineStageTimedOut
+            if activity_task is not None and activity_task in done:
+                yield activity_task.result()
+                activity_task = asyncio.create_task(activity.queue.get())
+
+        result.append(task.result())
+        if activity is not None:
+            while activity.has_pending_callbacks:
+                await asyncio.sleep(0)
+            while not activity.queue.empty():
+                yield activity.queue.get_nowait()
+    except BaseException:
+        task.cancel()
+        raise
+    finally:
+        if activity_task is not None:
+            activity_task.cancel()
+        if not task.done():
+            task.cancel()
+
+
+async def _bounded_deltas(
+    deltas: AsyncIterator[str], timeout: float
+) -> AsyncIterator[str]:
+    """Yield model output while imposing a total stage deadline."""
+    iterator = aiter(deltas)
+    deadline = asyncio.get_running_loop().time() + timeout
+    try:
+        while True:
+            remaining = deadline - asyncio.get_running_loop().time()
+            if remaining <= 0:
+                raise PipelineStageTimedOut
+            try:
+                yield await asyncio.wait_for(anext(iterator), timeout=remaining)
+            except StopAsyncIteration:
+                return
+    finally:
+        await iterator.aclose()
+
+
 async def stream_research_pipeline(
     topic: str,
     dependencies: PipelineDependencies | None = None,
     cancellation_event: asyncio.Event | None = None,
+    timeouts: PipelineTimeouts = PipelineTimeouts(),
 ) -> AsyncIterator[PipelineEvent]:
     """Run Search, Reader, Writer, and Critic while emitting safe events."""
     stages = dependencies or _default_dependencies()
@@ -134,7 +286,13 @@ async def stream_research_pipeline(
     try:
         current_agent = "search"
         yield _status(current_agent, "running")
-        result["search_results"] = await stages.search(topic)
+        yield _activity(current_agent, "thinking")
+        search_result: list[str] = []
+        async for event in _stream_stage_activity(
+            stages.search(topic), timeouts.search, stages.activity, search_result
+        ):
+            yield event
+        result["search_results"] = search_result[0]
         _raise_if_cancelled(cancellation_event)
         yield PipelineEvent(
             type="agent.output.delta",
@@ -145,7 +303,16 @@ async def stream_research_pipeline(
 
         current_agent = "reader"
         yield _status(current_agent, "running")
-        result["scraped_content"] = await stages.reader(topic, result["search_results"])
+        yield _activity(current_agent, "thinking")
+        reader_result: list[str] = []
+        async for event in _stream_stage_activity(
+            stages.reader(topic, result["search_results"]),
+            timeouts.reader,
+            stages.activity,
+            reader_result,
+        ):
+            yield event
+        result["scraped_content"] = reader_result[0]
         _raise_if_cancelled(cancellation_event)
         yield PipelineEvent(
             type="agent.output.delta",
@@ -156,11 +323,15 @@ async def stream_research_pipeline(
 
         current_agent = "writer"
         yield _status(current_agent, "running")
+        yield _activity(current_agent, "thinking")
+        yield _activity(current_agent, "streaming")
         research = (
             f"SEARCH RESULTS:\n{result['search_results']}\n\n"
             f"DETAILED SCRAPED CONTENT:\n{result['scraped_content']}"
         )
-        async for delta in stages.writer(topic, research):
+        async for delta in _bounded_deltas(
+            stages.writer(topic, research), timeouts.writer
+        ):
             _raise_if_cancelled(cancellation_event)
             result["report"] += delta
             yield PipelineEvent(
@@ -170,7 +341,11 @@ async def stream_research_pipeline(
 
         current_agent = "critic"
         yield _status(current_agent, "running")
-        async for delta in stages.critic(result["report"]):
+        yield _activity(current_agent, "thinking")
+        yield _activity(current_agent, "streaming")
+        async for delta in _bounded_deltas(
+            stages.critic(result["report"]), timeouts.critic
+        ):
             _raise_if_cancelled(cancellation_event)
             result["feedback"] += delta
             yield PipelineEvent(

@@ -68,7 +68,7 @@ def test_web_search_formats_results_and_limits_snippets(
         "URL: https://example.com/second\n"
         "Snippet: Short summary\n"
     )
-    client.search.assert_called_once_with(query="test topic", max_results=5)
+    client.search.assert_called_once_with(query="test topic", max_results=5, timeout=30)
 
 
 def test_scrape_url_uses_trafilatura_content(

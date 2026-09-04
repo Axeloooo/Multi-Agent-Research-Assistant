@@ -12,8 +12,10 @@ AgentStatus = Literal[
     "cancelled",
     "skipped",
 ]
+ActivityKind = Literal["thinking", "using_tool", "observing", "streaming"]
 EventType = Literal[
     "agent.status",
+    "agent.activity",
     "agent.output.delta",
     "report.delta",
     "critique.delta",
