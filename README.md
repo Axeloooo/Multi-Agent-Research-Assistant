@@ -67,11 +67,11 @@ flowchart LR
 
 The browser never receives raw tool calls, provider metadata, chain reasoning,
 or raw exceptions. It receives bounded agent summaries, report/critique deltas,
-and a fixed allowlist of activity labels. Search and Reader have 45-second
-deadlines, Writer has a 90-second deadline, Critic has a 45-second deadline,
-and Tavily requests time out after 30 seconds. A failed stage produces a safe
-terminal error and skips later stages. Disconnecting a browser does not cancel a
-run; use the explicit Cancel research action instead.
+and a fixed allowlist of activity labels. Search has a 90-second deadline,
+Reader has a 120-second deadline, Writer has a 90-second deadline, Critic has
+a 45-second deadline, and Tavily requests time out after 30 seconds. A failed
+stage produces a safe terminal error and skips later stages. Disconnecting a
+browser does not cancel a run; use the explicit Cancel research action instead.
 
 ## Local setup
 

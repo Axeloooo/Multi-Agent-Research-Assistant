@@ -34,8 +34,8 @@ class PipelineStageTimedOut(Exception):
 class PipelineTimeouts:
     """Maximum time each agent may occupy a research run, in seconds."""
 
-    search: float = 45
-    reader: float = 45
+    search: float = 90
+    reader: float = 120
     writer: float = 90
     critic: float = 45
 

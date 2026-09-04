@@ -22,6 +22,16 @@ ACTIVITY_LABELS = {
     "observing": "Observing tool result",
     "streaming": "Streaming response",
 }
+GENERIC_FAILURE_MESSAGE = "Research run failed. Please try again."
+SAFE_FAILURE_MESSAGES = frozenset(
+    {
+        GENERIC_FAILURE_MESSAGE,
+        *(
+            f"{agent.title()} took longer than expected. Please try again."
+            for agent in AGENTS
+        ),
+    }
+)
 
 
 @dataclass
@@ -232,9 +242,13 @@ class RunRegistry:
             return
 
         if event.type == "run.failed":
-            await self._finish(
-                record, "failed", "Research run failed. Please try again."
+            message = event.payload.get("message")
+            safe_message = (
+                message
+                if isinstance(message, str) and message in SAFE_FAILURE_MESSAGES
+                else GENERIC_FAILURE_MESSAGE
             )
+            await self._finish(record, "failed", safe_message)
 
     async def _finish(
         self, record: RunRecord, status: RunStatus, error: str | None = None

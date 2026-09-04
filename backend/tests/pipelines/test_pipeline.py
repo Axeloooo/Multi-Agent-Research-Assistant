@@ -125,6 +125,15 @@ def test_stream_research_pipeline_times_out_search_and_skips_later_stages() -> N
     }
 
 
+def test_default_timeouts_budget_multiple_provider_round_trips() -> None:
+    from src.pipelines.pipeline import PipelineTimeouts
+
+    timeouts = PipelineTimeouts()
+
+    assert timeouts.search >= 90
+    assert timeouts.reader >= 120
+
+
 def test_stream_research_pipeline_stops_at_cancellation_boundary() -> None:
     from src.pipelines.pipeline import (
         PipelineDependencies,

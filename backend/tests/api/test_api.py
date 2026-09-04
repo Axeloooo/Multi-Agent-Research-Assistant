@@ -143,6 +143,55 @@ def test_api_rejects_download_before_completion() -> None:
         assert client.get(f"/api/runs/{run_id}/downloads/report.md").status_code == 409
 
 
+def test_api_preserves_safe_stage_timeout_message() -> None:
+    async def timed_out_pipeline(
+        topic: str, cancellation_event: asyncio.Event
+    ) -> AsyncIterator[PipelineEvent]:
+        yield PipelineEvent(
+            type="agent.status", agent="reader", payload={"status": "failed"}
+        )
+        yield PipelineEvent(
+            type="run.failed",
+            agent="reader",
+            payload={"message": "Reader took longer than expected. Please try again."},
+        )
+
+    from src.api.app import create_app
+
+    with TestClient(create_app(pipeline_factory=timed_out_pipeline)) as client:
+        run_id = client.post("/api/runs", json={"topic": "climate policy"}).json()[
+            "run_id"
+        ]
+
+        snapshot = _wait_for_terminal(client, run_id)
+
+        assert snapshot["error"] == (
+            "Reader took longer than expected. Please try again."
+        )
+
+
+def test_api_redacts_unrecognized_pipeline_failure_message() -> None:
+    async def unsafe_failure_pipeline(
+        topic: str, cancellation_event: asyncio.Event
+    ) -> AsyncIterator[PipelineEvent]:
+        yield PipelineEvent(
+            type="run.failed",
+            agent="reader",
+            payload={"message": "provider failed with api_key=secret-value"},
+        )
+
+    from src.api.app import create_app
+
+    with TestClient(create_app(pipeline_factory=unsafe_failure_pipeline)) as client:
+        run_id = client.post("/api/runs", json={"topic": "climate policy"}).json()[
+            "run_id"
+        ]
+
+        snapshot = _wait_for_terminal(client, run_id)
+
+        assert snapshot["error"] == "Research run failed. Please try again."
+
+
 def test_cancelling_active_run_starts_the_next_queued_run() -> None:
     async def queued_pipeline(
         topic: str, cancellation_event: asyncio.Event
