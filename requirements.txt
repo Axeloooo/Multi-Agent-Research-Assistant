@@ -11,3 +11,6 @@ trafilatura
 requests
 lxml
 python-dotenv
+
+fastapi
+uvicorn[standard]
