@@ -210,7 +210,7 @@ def test_stream_research_pipeline_marks_later_stages_skipped_after_failure() -> 
     assert events[-1].payload == {"message": "Research run failed. Please try again."}
 
 
-def test_default_dependencies_keep_only_safe_assistant_search_output(
+def test_default_dependencies_keep_tool_urls_internal_and_browser_output_safe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from src.pipelines.pipeline import run_research_pipeline
@@ -218,10 +218,12 @@ def test_default_dependencies_keep_only_safe_assistant_search_output(
     class Agent:
         def __init__(self, response: dict[str, list[Any]]) -> None:
             self.response = response
+            self.payloads: list[dict[str, Any]] = []
 
         def invoke(
             self, payload: dict[str, Any], config: dict[str, Any]
         ) -> dict[str, list[Any]]:
+            self.payloads.append(payload)
             return self.response
 
     class Chain:
@@ -233,28 +235,45 @@ def test_default_dependencies_keep_only_safe_assistant_search_output(
                 yield chunk
 
     fake_agents = ModuleType("src.agents.agents")
-    fake_agents.build_search_agent = lambda: Agent(
+    search_agent = Agent(
         {
             "messages": [
                 HumanMessage(content="Find sources"),
-                ToolMessage(content="raw tool payload", tool_call_id="search-call"),
+                ToolMessage(
+                    content="URL: https://example.com/source",
+                    tool_call_id="search-call",
+                ),
                 AIMessage(content="Safe search summary"),
             ]
         }
     )
-    fake_agents.build_reader_agent = lambda: Agent(
-        {"messages": [AIMessage(content="Safe reader summary")]}
+    reader_agent = Agent(
+        {
+            "messages": [
+                HumanMessage(content="Read source"),
+                ToolMessage(content="private scraped page", tool_call_id="reader-call"),
+                AIMessage(content="Safe reader summary"),
+            ]
+        }
     )
+    fake_agents.build_search_agent = lambda: search_agent
+    fake_agents.build_reader_agent = lambda: reader_agent
     fake_agents.build_writer_chain = lambda: Chain(["Report"])
     fake_agents.build_critic_chain = lambda: Chain(["Critique"])
     monkeypatch.setitem(sys.modules, "src.agents.agents", fake_agents)
 
-    assert run_research_pipeline("topic") == {
+    result = run_research_pipeline("topic")
+
+    assert result == {
         "search_results": "Safe search summary",
         "scraped_content": "Safe reader summary",
         "report": "Report",
         "feedback": "Critique",
     }
+    reader_prompt = reader_agent.payloads[0]["messages"][0][1]
+    assert "https://example.com/source" in reader_prompt
+    assert "https://example.com/source" not in str(result)
+    assert "private scraped page" not in str(result)
 
 
 def test_default_dependencies_emit_safe_tool_lifecycle_activity(

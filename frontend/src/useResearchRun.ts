@@ -12,6 +12,7 @@ export interface AgentActivity {
 
 export interface RunSnapshot {
   run_id: string;
+  latest_event_id: number;
   topic: string;
   status: RunStatus;
   agents: Record<AgentName, AgentStatus>;
@@ -55,6 +56,7 @@ type RunAction =
   | { type: "clear" };
 
 const terminalStatuses = new Set<RunStatus>(["completed", "failed", "cancelled"]);
+const terminalEventTypes = new Set(["run.completed", "run.failed", "run.cancelled"]);
 
 function textPayload(payload: Record<string, unknown>, key: string): string {
   const value = payload[key];
@@ -82,7 +84,15 @@ export function runReducer(state: RunState, action: RunAction): RunState {
   }
   if (action.type === "snapshot") {
     const sameRun = state.snapshot?.run_id === action.snapshot.run_id;
-    return { snapshot: action.snapshot, lastEventId: sameRun ? state.lastEventId : 0 };
+    if (sameRun && action.snapshot.latest_event_id < state.lastEventId) {
+      return state;
+    }
+    return {
+      snapshot: action.snapshot,
+      lastEventId: sameRun
+        ? Math.max(state.lastEventId, action.snapshot.latest_event_id)
+        : action.snapshot.latest_event_id
+    };
   }
   if (!state.snapshot || action.event.id <= state.lastEventId) {
     return state;
@@ -142,13 +152,23 @@ export function useResearchRun(
   }, []);
 
   const connect = useCallback(
-    (start: StartResponse) => {
+    (start: StartResponse, latestEventId: number) => {
       let openedOnce = false;
-      const source = eventSourceFactory(start.events_url);
+      const separator = start.events_url.includes("?") ? "&" : "?";
+      const source = eventSourceFactory(
+        `${start.events_url}${separator}last_event_id=${latestEventId}`
+      );
       sourceRef.current = source;
       const updateFromEvent = (message: MessageEvent) => {
         try {
-          dispatch({ type: "event", event: JSON.parse(message.data) as RunEvent });
+          const event = JSON.parse(message.data) as RunEvent;
+          dispatch({ type: "event", event });
+          if (terminalEventTypes.has(event.type)) {
+            source.close();
+            if (sourceRef.current === source) {
+              sourceRef.current = null;
+            }
+          }
         } catch {
           // Ignore malformed event data; a later snapshot recovers the UI.
         }
@@ -169,7 +189,15 @@ export function useResearchRun(
       source.onopen = () => {
         if (openedOnce) {
           void fetchSnapshot(start.status_url)
-            .then((snapshot) => dispatch({ type: "snapshot", snapshot }))
+            .then((snapshot) => {
+              dispatch({ type: "snapshot", snapshot });
+              if (terminalStatuses.has(snapshot.status)) {
+                source.close();
+                if (sourceRef.current === source) {
+                  sourceRef.current = null;
+                }
+              }
+            })
             .catch(() => undefined);
         }
         openedOnce = true;
@@ -197,7 +225,9 @@ export function useResearchRun(
         const created = (await response.json()) as StartResponse;
         const snapshot = await fetchSnapshot(created.status_url);
         dispatch({ type: "snapshot", snapshot });
-        connect(created);
+        if (!terminalStatuses.has(snapshot.status)) {
+          connect(created, snapshot.latest_event_id);
+        }
       } finally {
         setIsSubmitting(false);
       }

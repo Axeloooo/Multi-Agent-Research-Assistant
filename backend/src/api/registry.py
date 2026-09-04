@@ -130,6 +130,7 @@ class RunRegistry:
         record = self.get(run_id)
         return {
             "run_id": record.run_id,
+            "latest_event_id": len(record.events),
             "topic": record.topic,
             "status": record.status,
             "agents": record.agents,
@@ -260,7 +261,9 @@ class RunRegistry:
         for agent, agent_status in record.agents.items():
             if agent_status in {"pending", "running"}:
                 record.agents[agent] = (
-                    "skipped" if status != "cancelled" else "cancelled"
+                    "cancelled"
+                    if status == "cancelled" and agent_status == "running"
+                    else "skipped"
                 )
                 await self._publish(
                     record,

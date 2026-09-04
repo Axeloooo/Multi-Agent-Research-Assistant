@@ -4,9 +4,10 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from threading import Lock
-from typing import Any
+from typing import Any, TypeVar
 
 from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.messages import ToolMessage
 
 from src.pipelines.events import (
     ActivityKind,
@@ -15,11 +16,22 @@ from src.pipelines.events import (
     PipelineResult,
 )
 
-SearchStage = Callable[[str], Awaitable[str]]
+
+@dataclass(frozen=True)
+class SearchOutput:
+    """Separate browser-safe search output from the Reader's tool context."""
+
+    summary: str
+    reader_context: str
+
+
+SearchStageResult = str | SearchOutput
+SearchStage = Callable[[str], Awaitable[SearchStageResult]]
 ReaderStage = Callable[[str, str], Awaitable[str]]
 WriterStage = Callable[[str, str], AsyncIterator[str]]
 CriticStage = Callable[[str], AsyncIterator[str]]
 AGENTS: tuple[AgentName, ...] = ("search", "reader", "writer", "critic")
+StageResult = TypeVar("StageResult")
 
 
 class PipelineCancelled(Exception):
@@ -148,7 +160,7 @@ def _default_dependencies() -> PipelineDependencies:
 
     activity = _ActivityEmitter()
 
-    async def search(topic: str) -> str:
+    async def search(topic: str) -> SearchOutput:
         agent = build_search_agent()
         result = await asyncio.to_thread(
             agent.invoke,
@@ -159,7 +171,15 @@ def _default_dependencies() -> PipelineDependencies:
             },
             config={"callbacks": [activity.callback("search")]},
         )
-        return _message_text(result["messages"][-1])
+        messages = result["messages"]
+        summary = _message_text(messages[-1])
+        tool_context = "\n\n".join(
+            _message_text(message)
+            for message in messages
+            if isinstance(message, ToolMessage)
+        )
+        reader_context = "\n\n".join(part for part in (summary, tool_context) if part)
+        return SearchOutput(summary=summary, reader_context=reader_context)
 
     async def reader(topic: str, search_results: str) -> str:
         agent = build_reader_agent()
@@ -203,10 +223,10 @@ def _raise_if_cancelled(cancellation_event: asyncio.Event | None) -> None:
 
 
 async def _stream_stage_activity(
-    awaitable: Awaitable[str],
+    awaitable: Awaitable[StageResult],
     timeout: float,
     activity: _ActivityEmitter | None,
-    result: list[str],
+    result: list[StageResult],
 ) -> AsyncIterator[PipelineEvent]:
     """Wait for a stage while relaying provider activity and enforcing its deadline."""
     task = asyncio.ensure_future(awaitable)
@@ -287,12 +307,18 @@ async def stream_research_pipeline(
         current_agent = "search"
         yield _status(current_agent, "running")
         yield _activity(current_agent, "thinking")
-        search_result: list[str] = []
+        search_result: list[SearchStageResult] = []
         async for event in _stream_stage_activity(
             stages.search(topic), timeouts.search, stages.activity, search_result
         ):
             yield event
-        result["search_results"] = search_result[0]
+        search_output = search_result[0]
+        if isinstance(search_output, SearchOutput):
+            result["search_results"] = search_output.summary
+            reader_context = search_output.reader_context
+        else:
+            result["search_results"] = search_output
+            reader_context = search_output
         _raise_if_cancelled(cancellation_event)
         yield PipelineEvent(
             type="agent.output.delta",
@@ -306,7 +332,7 @@ async def stream_research_pipeline(
         yield _activity(current_agent, "thinking")
         reader_result: list[str] = []
         async for event in _stream_stage_activity(
-            stages.reader(topic, result["search_results"]),
+            stages.reader(topic, reader_context),
             timeouts.reader,
             stages.activity,
             reader_result,

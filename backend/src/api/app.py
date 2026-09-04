@@ -85,20 +85,24 @@ def create_app(pipeline_factory: PipelineFactory = _default_pipeline) -> FastAPI
             ) from error
 
     @app.get("/api/runs/{run_id}/events")
-    async def stream_events(run_id: str, request: Request) -> StreamingResponse:
+    async def stream_events(
+        run_id: str, request: Request, last_event_id: int | None = None
+    ) -> StreamingResponse:
         try:
             registry.get(run_id)
         except KeyError as error:
             raise HTTPException(
                 status_code=404, detail="Research run not found."
             ) from error
-        try:
-            last_event_id = int(request.headers.get("Last-Event-ID", "0"))
-        except ValueError:
-            last_event_id = 0
+        header_cursor = request.headers.get("Last-Event-ID")
+        if header_cursor is not None:
+            try:
+                last_event_id = int(header_cursor)
+            except ValueError:
+                last_event_id = 0
 
         async def event_stream() -> AsyncIterator[str]:
-            cursor = max(last_event_id, 0)
+            cursor = max(last_event_id or 0, 0)
             while True:
                 if await request.is_disconnected():
                     return

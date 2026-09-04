@@ -100,6 +100,7 @@ def test_api_streams_replayable_safe_events_and_downloads() -> None:
         }
         assert snapshot["report"] == "Report body"
         assert snapshot["critique"] == "Looks good"
+        assert snapshot["latest_event_id"] > 0
 
         events = client.get(f"/api/runs/{run_id}/events")
         assert events.status_code == 200
@@ -114,6 +115,10 @@ def test_api_streams_replayable_safe_events_and_downloads() -> None:
         )
         assert "id: 1\nevent:" not in replay.text
         assert "event: run.completed" in replay.text
+
+        query_replay = client.get(f"/api/runs/{run_id}/events?last_event_id=1")
+        assert "id: 1\nevent:" not in query_replay.text
+        assert "event: run.completed" in query_replay.text
 
         markdown = client.get(f"/api/runs/{run_id}/downloads/report.md")
         assert markdown.status_code == 200
@@ -225,6 +230,12 @@ def test_cancelling_active_run_starts_the_next_queued_run() -> None:
         cancelled = client.delete(f"/api/runs/{first_id}")
         assert cancelled.status_code == 200
         assert cancelled.json()["status"] == "cancelled"
+        assert cancelled.json()["agents"] == {
+            "search": "cancelled",
+            "reader": "skipped",
+            "writer": "skipped",
+            "critic": "skipped",
+        }
         assert client.delete(f"/api/runs/{first_id}").json()["status"] == "cancelled"
 
         assert _wait_for_terminal(client, second_id)["report"] == "Second report"
