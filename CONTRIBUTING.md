@@ -108,7 +108,7 @@ Before requesting review, confirm that:
 - [ ] Black, Flake8, and pytest pass locally.
 - [ ] Prettier, ESLint, Vitest, the frontend build, and Storybook pass locally.
 - [ ] Playwright passes for UI or API streaming changes.
-- [ ] Coverage remains at or above 80% for `backend/src/research_assistant`.
+- [ ] Coverage remains at or above 80% for `backend/src`.
 - [ ] User-facing documentation is accurate.
 - [ ] The pull request explains the change and how it was verified.
 

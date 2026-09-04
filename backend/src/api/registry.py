@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import uuid4
 
-from backend.src.pipelines.events import AgentName, AgentStatus, PipelineEvent
+from src.pipelines.events import AgentName, AgentStatus, PipelineEvent
 
 RunStatus = Literal["queued", "running", "completed", "failed", "cancelled"]
 PipelineFactory = Callable[[str, asyncio.Event], AsyncIterator[PipelineEvent]]

@@ -11,12 +11,12 @@ authentication, citations, or evaluations as implemented.
 ## Architecture boundaries
 
 - Keep external retrieval and extraction adapters in
-  `backend/src/research_assistant/tools/`.
-- Keep agent construction and prompts in `backend/src/research_assistant/agents/`.
+  `backend/src/tools/`.
+- Keep agent construction and prompts in `backend/src/agents/`.
 - Keep cross-agent sequencing and state in
-  `backend/src/research_assistant/pipelines/`.
+  `backend/src/pipelines/`.
 - Keep API entry points thin; backend logic belongs under
-  `backend/src/research_assistant/` and UI logic under `frontend/src/`.
+  `backend/src/` and UI logic under `frontend/src/`.
 - Keep backend tests in `backend/tests/{agents,api,pipelines,tools}/` and
   frontend tests in `frontend/tests/{unit,e2e}/`.
 - Prefer small, typed interfaces over shared mutable state.
@@ -42,7 +42,7 @@ cd backend && .venv/bin/pytest
 
 Black is the only formatter. Flake8 is the linter. Do not introduce Ruff,
 isort, uv, or a lockfile without an approved tooling change. Maintain at least
-80% line coverage across `backend/src/research_assistant`.
+80% line coverage across `backend/src`.
 
 ## Change discipline
 

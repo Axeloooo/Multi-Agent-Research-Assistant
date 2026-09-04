@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 
 from fastapi.testclient import TestClient
 
-from research_assistant.pipelines.events import PipelineEvent
+from src.pipelines.events import PipelineEvent
 
 
 def _scripted_pipeline(
@@ -63,7 +63,7 @@ def _scripted_pipeline(
 
 
 def _client() -> TestClient:
-    from research_assistant.api.app import create_app
+    from src.api.app import create_app
 
     return TestClient(create_app(pipeline_factory=_scripted_pipeline))
 
@@ -134,7 +134,7 @@ def test_api_rejects_download_before_completion() -> None:
         )
         await asyncio.Event().wait()
 
-    from research_assistant.api.app import create_app
+    from src.api.app import create_app
 
     with TestClient(create_app(pipeline_factory=pending_pipeline)) as client:
         run_id = client.post("/api/runs", json={"topic": "climate policy"}).json()[
@@ -166,7 +166,7 @@ def test_cancelling_active_run_starts_the_next_queued_run() -> None:
                 },
             )
 
-    from research_assistant.api.app import create_app
+    from src.api.app import create_app
 
     with TestClient(create_app(pipeline_factory=queued_pipeline)) as client:
         first_id = client.post("/api/runs", json={"topic": "first"}).json()["run_id"]

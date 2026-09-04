@@ -54,11 +54,11 @@ flowchart LR
 
 ## Architecture and safety
 
-- `backend/src/research_assistant/tools/` contains provider and extraction adapters.
-- `backend/src/research_assistant/agents/` constructs agent prompts and chains.
-- `backend/src/research_assistant/pipelines/` owns typed stage sequencing and
+- `backend/src/tools/` contains provider and extraction adapters.
+- `backend/src/agents/` constructs agent prompts and chains.
+- `backend/src/pipelines/` owns typed stage sequencing and
   provider-neutral events.
-- `backend/src/research_assistant/api/` turns safe pipeline events into REST,
+- `backend/src/api/` turns safe pipeline events into REST,
   SSE, snapshots, cancellation,
   and downloads.
 - `frontend/` is the Vite TypeScript application.
@@ -109,7 +109,7 @@ For local development, start the API and frontend in separate terminals:
 
 ```zsh
 # Terminal 1, backend/
-.venv/bin/uvicorn research_assistant.api.app:create_app --factory --reload --port 8000
+.venv/bin/uvicorn src.api.app:create_app --factory --reload --port 8000
 
 # Terminal 2
 cd frontend
@@ -124,7 +124,7 @@ run `npm run build`; FastAPI serves `frontend/dist` when it exists.
 
 Python quality gates remain Black and Flake8. Frontend source uses ESLint and
 Prettier. The Python suite requires at least 80% line coverage across
-`backend/src/research_assistant`.
+`backend/src`.
 
 ```zsh
 # Backend

@@ -13,7 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableSerializable
 from langgraph.graph.state import CompiledStateGraph
 
-from backend.src.tools.tools import scrape_url, web_search
+from src.tools.tools import scrape_url, web_search
 
 load_dotenv()
 

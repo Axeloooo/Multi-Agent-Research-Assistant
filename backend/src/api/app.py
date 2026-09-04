@@ -10,13 +10,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
 
-from backend.src.api.registry import (
+from src.api.registry import (
     PipelineFactory,
     RunRegistry,
     TERMINAL_STATUSES,
 )
-from backend.src.pipelines.events import PipelineEvent
-from backend.src.pipelines.pipeline import stream_research_pipeline
+from src.pipelines.events import PipelineEvent
+from src.pipelines.pipeline import stream_research_pipeline
 
 
 class StartRunRequest(BaseModel):
@@ -44,6 +44,11 @@ def _default_pipeline(
 def _sse_frame(event: dict[str, object]) -> str:
     payload = json.dumps(event, separators=(",", ":"))
     return f"id: {event['id']}\nevent: {event['type']}\ndata: {payload}\n\n"
+
+
+def _frontend_dist() -> Path:
+    """Resolve the frontend build from the repository-root layout."""
+    return Path(__file__).parents[3] / "frontend" / "dist"
 
 
 def create_app(pipeline_factory: PipelineFactory = _default_pipeline) -> FastAPI:
@@ -136,7 +141,7 @@ def create_app(pipeline_factory: PipelineFactory = _default_pipeline) -> FastAPI
     async def download_json(run_id: str) -> JSONResponse:
         return JSONResponse(_completed_snapshot(registry, run_id))
 
-    frontend_dist = Path(__file__).parents[4] / "frontend/dist"
+    frontend_dist = _frontend_dist()
     if frontend_dist.is_dir():
         from fastapi.staticfiles import StaticFiles
 
