@@ -17,10 +17,6 @@ from src.tools.tools import scrape_url, web_search
 
 load_dotenv()
 
-llm: BaseChatModel = init_chat_model(
-    model="google_genai:gemini-3.5-flash-lite",
-)
-
 AgentGraph: TypeAlias = CompiledStateGraph[
     AgentState[Any], Any, InputAgentState, OutputAgentState[Any]
 ]
@@ -71,10 +67,6 @@ Be detailed, factual and professional.""",
     ]
 )
 
-writer_chain: RunnableSerializable[dict[str, Any], str] = (
-    writer_prompt | llm | StrOutputParser()
-)
-
 critic_prompt: ChatPromptTemplate = ChatPromptTemplate.from_messages(
     [
         (
@@ -107,6 +99,17 @@ One line verdict:
     ]
 )
 
-critic_chain: RunnableSerializable[dict[str, Any], str] = (
-    critic_prompt | llm | StrOutputParser()
-)
+
+def _build_model() -> BaseChatModel:
+    """Create the configured Gemini model only when a stage needs it."""
+    return init_chat_model(model="google_genai:gemini-3.5-flash-lite")
+
+
+def build_writer_chain() -> RunnableSerializable[dict[str, Any], str]:
+    """Build the report-generation chain."""
+    return writer_prompt | _build_model() | StrOutputParser()
+
+
+def build_critic_chain() -> RunnableSerializable[dict[str, Any], str]:
+    """Build the report-critique chain."""
+    return critic_prompt | _build_model() | StrOutputParser()
