@@ -1,7 +1,7 @@
 # Contributing to Multi-Agent Research Assistant
 
-Thank you for helping improve the project. It is currently pre-alpha, so small,
-well-tested changes are easier to review than large feature bundles.
+Thank you for helping improve the project. It is a Beta local application, so
+small, well-tested changes are easier to review than large feature bundles.
 
 By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
@@ -22,14 +22,17 @@ cd Multi-Agent-Research-Assistant
 git remote add upstream https://github.com/Axeloooo/Multi-Agent-Research-Assistant.git
 ```
 
-Create the project environment:
+Create the project and frontend environments:
 
 ```zsh
+cd backend
 pyenv install
 python -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements-dev.txt
+cd ../frontend
+npm install
+cd ..
 cp .env.example .env
 ```
 
@@ -45,7 +48,7 @@ Create your branch from the latest `devel` branch:
 git fetch upstream
 git switch devel
 git pull --ff-only upstream devel
-git switch -c feat/short-description
+git switch -c feature/short-description
 ```
 
 Open contributor pull requests against `devel`. Maintainers promote reviewed
@@ -62,7 +65,9 @@ notes can be generated consistently. Common prefixes include:
 
 ## Development standards
 
-- Keep agents, tools, pipelines, and interfaces separated by responsibility.
+- Keep backend agents, tools, pipelines, and API interfaces under `backend/src/`.
+- Keep frontend UI code under `frontend/src/`; use `frontend/tests/unit/` and
+  `frontend/tests/e2e/` for its tests.
 - Add type hints and concise docstrings to public Python interfaces.
 - Write a failing test before changing production behavior.
 - Mock Gemini, Tavily, and HTTP calls in the default test suite.
@@ -72,12 +77,25 @@ notes can be generated consistently. Common prefixes include:
 Run the full local quality gate before pushing:
 
 ```zsh
-black --check .
-flake8 .
-pytest
+cd backend
+.venv/bin/black --check .
+.venv/bin/flake8 .
+.venv/bin/pytest
+
+cd frontend
+npm run format
+npm run lint
+npm test
+npm run build
+npm run build-storybook
 ```
 
-To apply the formatter, run `black .` and repeat the checks.
+Run `npx playwright install chromium` once, then use `npm run test:e2e` for the
+offline browser test. It starts a real local FastAPI API with a deterministic
+fake pipeline; it never uses provider credentials or the network.
+
+Apply formatters with `black .` and `cd frontend && npm run format:write`, then
+repeat the checks.
 
 ## Pull request checklist
 
@@ -88,7 +106,9 @@ Before requesting review, confirm that:
 - [ ] New or changed behavior is covered by tests.
 - [ ] Tests do not use live network calls or real credentials.
 - [ ] Black, Flake8, and pytest pass locally.
-- [ ] Coverage remains at or above 80% for `src`.
+- [ ] Prettier, ESLint, Vitest, the frontend build, and Storybook pass locally.
+- [ ] Playwright passes for UI or API streaming changes.
+- [ ] Coverage remains at or above 80% for `backend/src`.
 - [ ] User-facing documentation is accurate.
 - [ ] The pull request explains the change and how it was verified.
 

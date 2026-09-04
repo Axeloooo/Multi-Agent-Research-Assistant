@@ -2,192 +2,181 @@
 
 # Multi-Agent Research Assistant
 
-**A pre-alpha foundation for a planned Gemini-powered workflow that discovers, reads, writes, and reviews evidence from the web.**
+**A Beta, local-first research command center that streams a Search → Reader → Writer → Critic workflow to a polished web UI.**
 
 [![CI](https://github.com/Axeloooo/Multi-Agent-Research-Assistant/actions/workflows/ci.yaml/badge.svg?branch=devel)](https://github.com/Axeloooo/Multi-Agent-Research-Assistant/actions/workflows/ci.yaml)
 [![Python 3.14.7](https://img.shields.io/badge/python-3.14.7-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Code style: Black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Status: Pre--alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#project-status)
+[![Node 22+](https://img.shields.io/badge/node-22%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Status: Beta](https://img.shields.io/badge/status-beta-0ea5e9.svg)](#project-status)
 
 </div>
 
 > [!IMPORTANT]
-> This project is in **pre-alpha development**. The research tools and project
-> foundation are being built now; there is not yet a runnable end-to-end
-> assistant.
+> This is a Beta local application. Its command center, typed streaming runtime,
+> safe live agent-activity feed, and offline test harness are implemented. Live
+> research requires valid Gemini and Tavily credentials and provider setup.
 
-## 📚 Table of contents
+## Overview
 
-- [Overview](#-overview)
-- [Project status](#-project-status)
-- [Planned workflow](#-planned-workflow)
-- [Technology](#-technology)
-- [Project structure](#-project-structure)
-- [Getting started](#-getting-started)
-- [Development](#-development)
-- [Roadmap](#-roadmap)
-- [Contributing](#-contributing)
-- [Code of conduct](#-code-of-conduct)
-- [License](#-license)
+Enter a focused question in the browser and watch four agents advance through a
+single research run. The UI shows safe per-agent summaries and fixed, live
+activity labels such as “Thinking”, “Using tool”, and “Streaming response”. It
+streams the report and critique as they arrive, supports cancellation, and
+offers Markdown and JSON downloads once the run completes.
 
-## 🔎 Overview
-
-Multi-Agent Research Assistant is an early-stage Python project for turning a
-research question into a sourced report and a separate quality review. The
-planned design assigns each stage to a focused component: finding sources,
-extracting readable content, synthesizing a report, and critiquing the result.
-
-The current implementation provides the web-search and content-extraction
-tools that will support those agents. Google Gemini is the planned language
-model provider, while Tavily supplies web discovery.
-
-## 🚧 Project status
-
-| Area | Status |
-| --- | --- |
-| Tavily web-search tool | Implemented and unit tested |
-| Multi-strategy page extraction | Implemented and unit tested |
-| Gemini agent roles | In progress |
-| Research pipeline | Planned |
-| Command-line interface | Planned |
-| Streamlit interface | Planned |
-
-The README documents only commands that work in the current repository.
-Planned capabilities are labeled explicitly and should not be treated as a
-stable API.
-
-## 🧭 Planned workflow
+The application is intentionally local and process-scoped: it retains up to 20
+completed runs in memory, runs one job at a time, and loses run history when the
+server restarts. It is not yet a multi-user service or durable job queue.
 
 ```mermaid
 flowchart LR
-    Question[Research question] --> WebUI[Streamlit UI]
-    Question --> CLI[CLI]
-    WebUI --> Pipeline[Research pipeline]
-    CLI --> Pipeline
-    Pipeline --> Search[Search agent]
-    Search --> Tavily[Tavily web search]
-    Search --> Reader[Reader agent]
-    Reader --> Extractors[Trafilatura / Readability / BeautifulSoup]
-    Reader --> Writer[Writer chain]
-    Writer --> Critic[Critic chain]
-    Critic --> Output[Report + quality feedback]
-    Gemini[Google Gemini] -. powers .-> Search
-    Gemini -. powers .-> Reader
-    Gemini -. powers .-> Writer
-    Gemini -. powers .-> Critic
+    UI[Vite + React command center] -->|REST| API[FastAPI run API]
+    UI <-->|SSE| API
+    API --> Queue[Single in-memory run queue]
+    Queue --> Search[Search]
+    Search --> Reader[Reader]
+    Reader --> Writer[Writer]
+    Writer --> Critic[Critic]
+    Critic --> Output[Report + critique + downloads]
 ```
 
-This diagram represents the target architecture, not the current execution
-state.
+## Project status
 
-## 🛠️ Technology
-
-| Technology | Role |
+| Area | Status |
 | --- | --- |
-| Python 3.14.7 | Application runtime |
-| LangChain | Agent and tool composition |
-| Google Gemini | Planned agent reasoning and report generation |
-| Tavily | Web search |
-| Trafilatura | Primary article extraction |
-| Readability + Beautiful Soup | Extraction fallbacks |
-| Black + Flake8 | Formatting and linting |
-| pytest + pytest-cov | Automated tests and coverage |
+| Tavily search and multi-strategy extraction adapters | Implemented and unit tested |
+| Gemini Search, Reader, Writer, and Critic construction | Implemented; requires local credentials for live use |
+| Typed async research pipeline with bounded stage deadlines | Implemented and unit tested |
+| FastAPI run queue, status snapshots, cancellation, and SSE replay | Implemented and unit tested |
+| React + Vite + Tailwind command center | Implemented |
+| Storybook, Vitest/RTL, and Playwright E2E coverage | Implemented; default tests use no live providers |
+| Durable storage, authentication, citations, and evaluations | Planned |
 
-## 🗂️ Project structure
+## Architecture and safety
 
-```text
-.
-├── .github/workflows/       # Continuous integration and releases
-├── src/
-│   ├── agents/              # Agent builders (in progress)
-│   ├── pipelines/           # Planned workflow orchestration
-│   └── tools/               # Search and content-extraction tools
-├── tests/                   # Offline unit and structure tests
-├── .env.example             # Required environment variable names
-├── .flake8                  # Flake8 configuration
-├── AGENTS.md                # Codex project instructions
-├── CODE_OF_CONDUCT.md       # Community standards
-├── CONTRIBUTING.md          # Contributor workflow
-├── main.py                  # Planned CLI entry point
-├── pyproject.toml           # Black, pytest, and coverage settings
-├── requirements.txt         # Runtime dependencies
-└── requirements-dev.txt     # Runtime and development dependencies
-```
+- `backend/src/tools/` contains provider and extraction adapters.
+- `backend/src/agents/` constructs agent prompts and chains.
+- `backend/src/pipelines/` owns typed stage sequencing and
+  provider-neutral events.
+- `backend/src/api/` turns safe pipeline events into REST,
+  SSE, snapshots, cancellation,
+  and downloads.
+- `frontend/` is the Vite TypeScript application.
+- `backend/tests/{agents,api,pipelines,tools}/` and
+  `frontend/tests/{unit,e2e}/` mirror the runtime boundaries.
 
-## 🚀 Getting started
+The browser never receives raw tool calls, provider metadata, chain reasoning,
+or raw exceptions. It receives bounded agent summaries, report/critique deltas,
+and a fixed allowlist of activity labels. Search has a 90-second deadline,
+Reader has a 120-second deadline, Writer has a 90-second deadline, Critic has
+a 45-second deadline, and Tavily requests time out after 30 seconds. A failed
+stage produces a safe terminal error and skips later stages. Disconnecting a
+browser does not cancel a run; use the explicit Cancel research action instead.
 
-### Prerequisites
+## Local setup
 
-- [Git](https://git-scm.com/)
-- [pyenv](https://github.com/pyenv/pyenv)
-- Gemini and Tavily API keys for future live agent execution
-
-### Set up the repository
+Prerequisites: Git, Python 3.14.7 (managed by `pyenv`), Node.js 22.13+ and npm
+10+, plus Gemini and Tavily keys only for manually exercising live providers.
 
 ```zsh
 git clone https://github.com/Axeloooo/Multi-Agent-Research-Assistant.git
 cd Multi-Agent-Research-Assistant
 
+cd backend
 pyenv install
 python -m venv .venv
-source .venv/bin/activate
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements-dev.txt
 
-python -m pip install --upgrade pip
-python -m pip install -r requirements-dev.txt
+cd ../frontend
+npm install
+
+cd ..
 cp .env.example .env
+
+cd backend
 ```
 
-Add your local credentials to `.env`:
+Add credentials only to your uncommitted `.env` when manually testing live
+providers:
 
 ```dotenv
 GEMINI_API_KEY=your_gemini_api_key
 TAVILY_API_KEY=your_tavily_api_key
 ```
 
-Never commit `.env` or real credentials. The default test suite uses mocks and
-does not require either key.
+## Run the command center
 
-## 🧪 Development
-
-Run the same quality checks used by CI:
+For local development, start the API and frontend in separate terminals:
 
 ```zsh
-black --check .
-flake8 .
-pytest
+# Terminal 1, backend/
+.venv/bin/uvicorn src.api.app:create_app --factory --reload --port 8000
+
+# Terminal 2
+cd frontend
+npm run dev
 ```
 
-Apply Black formatting with:
+Open the URL Vite prints (normally `http://localhost:5173`). The development
+server proxies `/api` requests to FastAPI. For a production-like local preview,
+run `npm run build`; FastAPI serves `frontend/dist` when it exists.
+
+## Development and tests
+
+Python quality gates remain Black and Flake8. Frontend source uses ESLint and
+Prettier. The Python suite requires at least 80% line coverage across
+`backend/src`.
 
 ```zsh
-black .
+# Backend
+cd backend
+.venv/bin/black --check .
+.venv/bin/flake8 .
+.venv/bin/pytest
+
+# Frontend
+cd frontend
+npm run format
+npm run lint
+npm test
+npm run build
+npm run build-storybook
 ```
 
-The test suite enforces at least 80% line coverage across `src`.
+Playwright runs an actual local FastAPI API with a deterministic, credential-free
+pipeline and a Vite browser client. Install Chromium once, then run the suite:
 
-## 🗺️ Roadmap
+```zsh
+cd frontend
+npx playwright install chromium
+npm run test:e2e
+```
 
-- [x] Establish the Python package and development workflow
-- [x] Add tested web-search and multi-strategy extraction tools
-- [x] Add contributor documentation and automated quality checks
-- [ ] Configure Gemini-backed Search, Reader, Writer, and Critic roles
-- [ ] Orchestrate the end-to-end research pipeline
-- [ ] Add a command-line experience
-- [ ] Add a Streamlit interface
-- [ ] Add citation validation, observability, and evaluation datasets
+The CI workflow runs the backend checks, frontend format/lint/unit/build/
+Storybook checks, then the browser test. No default test makes live provider or
+network calls.
 
-## 🤝 Contributing
+## Technology
 
-Contributions are welcome while the project takes shape. Read
-[CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Contributor
-changes target the `devel` branch and use Conventional Commit messages.
+| Technology | Role |
+| --- | --- |
+| Python + FastAPI + Uvicorn | Run orchestration, REST API, SSE, downloads |
+| LangChain + Gemini + Tavily | Live research providers |
+| React + Vite + TypeScript + Tailwind | Local command-center UI |
+| Storybook | Component development and accessibility addon |
+| pytest + pytest-cov | Offline Python tests and coverage |
+| Vitest + React Testing Library | Frontend unit tests |
+| Playwright | Browser E2E test with a fake pipeline |
+| Black + Flake8 + ESLint + Prettier | Formatting and linting |
 
-## 🫶 Code of conduct
+## Contributing
 
-Participation in this project is governed by the
-[Code of Conduct](CODE_OF_CONDUCT.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Branches
+start from and target `devel`; commits use Conventional Commits so
+semantic-release can classify changes. Never commit `.env`, API keys, private
+research data, or generated sensitive reports.
 
-## 📄 License
+## License
 
 This project is available under the [MIT License](LICENSE).
