@@ -11,6 +11,7 @@ const emptyAgents = {
   critic: "pending"
 } as const;
 const emptySummaries = { search: "", reader: "", writer: "", critic: "" };
+const emptyActivities = { search: null, reader: null, writer: null, critic: null };
 
 export default function App() {
   const [topic, setTopic] = useState("");
@@ -147,6 +148,7 @@ export default function App() {
             <RunTimeline
               agents={snapshot?.agents ?? emptyAgents}
               summaries={snapshot?.summaries ?? emptySummaries}
+              activities={snapshot?.activities ?? emptyActivities}
             />
             <ResultPanel snapshot={snapshot} />
           </div>

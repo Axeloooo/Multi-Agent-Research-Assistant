@@ -18,6 +18,17 @@ async def fake_pipeline(
         type="agent.status", agent="search", payload={"status": "running"}
     )
     yield PipelineEvent(
+        type="agent.activity",
+        agent="search",
+        payload={"kind": "thinking", "label": "Thinking"},
+    )
+    await asyncio.sleep(0.15)
+    yield PipelineEvent(
+        type="agent.activity",
+        agent="search",
+        payload={"kind": "using_tool", "label": "Using tool"},
+    )
+    yield PipelineEvent(
         type="agent.output.delta",
         agent="search",
         payload={"delta": f"Reliable sources for {topic}."},
@@ -28,6 +39,18 @@ async def fake_pipeline(
     for agent in ("reader", "writer", "critic"):
         yield PipelineEvent(
             type="agent.status", agent=agent, payload={"status": "running"}
+        )
+        yield PipelineEvent(
+            type="agent.activity",
+            agent=agent,
+            payload={
+                "kind": "streaming" if agent in {"writer", "critic"} else "thinking",
+                "label": (
+                    "Streaming response"
+                    if agent in {"writer", "critic"}
+                    else "Thinking"
+                ),
+            },
         )
         await asyncio.sleep(0.03)
         if agent == "writer":

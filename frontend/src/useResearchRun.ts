@@ -3,6 +3,12 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 export type AgentName = "search" | "reader" | "writer" | "critic";
 export type AgentStatus = "pending" | "running" | "completed" | "failed" | "cancelled" | "skipped";
 export type RunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+export type ActivityKind = "thinking" | "using_tool" | "observing" | "streaming";
+
+export interface AgentActivity {
+  kind: ActivityKind;
+  label: string;
+}
 
 export interface RunSnapshot {
   run_id: string;
@@ -10,6 +16,7 @@ export interface RunSnapshot {
   status: RunStatus;
   agents: Record<AgentName, AgentStatus>;
   summaries: Record<AgentName, string>;
+  activities: Record<AgentName, AgentActivity | null>;
   report: string;
   critique: string;
   error: string | null;
@@ -54,6 +61,21 @@ function textPayload(payload: Record<string, unknown>, key: string): string {
   return typeof value === "string" ? value : "";
 }
 
+function activityPayload(payload: Record<string, unknown>): AgentActivity | null {
+  const kind = textPayload(payload, "kind");
+  const label = textPayload(payload, "label");
+  const labels: Record<ActivityKind, string> = {
+    thinking: "Thinking",
+    using_tool: "Using tool",
+    observing: "Observing tool result",
+    streaming: "Streaming response"
+  };
+  if (kind in labels && label === labels[kind as ActivityKind]) {
+    return { kind: kind as ActivityKind, label };
+  }
+  return null;
+}
+
 export function runReducer(state: RunState, action: RunAction): RunState {
   if (action.type === "clear") {
     return initialRunState;
@@ -69,7 +91,8 @@ export function runReducer(state: RunState, action: RunAction): RunState {
   const snapshot = {
     ...state.snapshot,
     agents: { ...state.snapshot.agents },
-    summaries: { ...state.snapshot.summaries }
+    summaries: { ...state.snapshot.summaries },
+    activities: { ...state.snapshot.activities }
   };
   const { agent, payload, type } = action.event;
   if (type === "agent.status" && agent) {
@@ -77,6 +100,8 @@ export function runReducer(state: RunState, action: RunAction): RunState {
     snapshot.agents[agent] = status;
   } else if (type === "agent.output.delta" && agent) {
     snapshot.summaries[agent] += textPayload(payload, "delta");
+  } else if (type === "agent.activity" && agent) {
+    snapshot.activities[agent] = activityPayload(payload);
   } else if (type === "report.delta") {
     snapshot.report += textPayload(payload, "delta");
   } else if (type === "critique.delta") {
@@ -131,6 +156,7 @@ export function useResearchRun(
       for (const eventType of [
         "run.started",
         "agent.status",
+        "agent.activity",
         "agent.output.delta",
         "report.delta",
         "critique.delta",

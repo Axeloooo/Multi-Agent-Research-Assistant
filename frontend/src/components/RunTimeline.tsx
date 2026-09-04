@@ -1,8 +1,9 @@
-import type { AgentName, AgentStatus } from "../useResearchRun";
+import type { AgentActivity, AgentName, AgentStatus } from "../useResearchRun";
 
 interface RunTimelineProps {
   agents: Record<AgentName, AgentStatus>;
   summaries: Record<AgentName, string>;
+  activities: Record<AgentName, AgentActivity | null>;
 }
 
 const stages: Array<{ name: AgentName; label: string; detail: string }> = [
@@ -21,7 +22,7 @@ const statusCopy: Record<AgentStatus, string> = {
   skipped: "Skipped"
 };
 
-export function RunTimeline({ agents, summaries }: RunTimelineProps) {
+export function RunTimeline({ agents, summaries, activities }: RunTimelineProps) {
   return (
     <section aria-labelledby="agent-progress-heading" className="panel p-6">
       <div className="mb-6 flex items-start justify-between gap-4">
@@ -39,6 +40,7 @@ export function RunTimeline({ agents, summaries }: RunTimelineProps) {
         {stages.map((stage, index) => {
           const status = agents[stage.name];
           const summary = summaries[stage.name];
+          const activity = status === "running" ? activities[stage.name] : null;
           return (
             <li key={stage.name} className="stage-card" data-status={status}>
               <div className="flex items-start justify-between gap-3">
@@ -47,6 +49,12 @@ export function RunTimeline({ agents, summaries }: RunTimelineProps) {
               </div>
               <h3 className="mt-6 font-semibold text-white">{stage.label}</h3>
               <p className="mt-1 text-sm text-slate-400">{stage.detail}</p>
+              {activity ? (
+                <p className="agent-activity mt-4" role="status" aria-live="polite">
+                  <span className="agent-activity-dot" aria-hidden="true" />
+                  {activity.label}
+                </p>
+              ) : null}
               {summary ? (
                 <details className="mt-4 border-t border-white/8 pt-3">
                   <summary className="cursor-pointer text-sm font-medium text-cyan-200">

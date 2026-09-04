@@ -18,6 +18,12 @@ export const Active: Story = {
       reader: "Extracted technical and policy context.",
       writer: "",
       critic: ""
+    },
+    activities: {
+      search: null,
+      reader: null,
+      writer: { kind: "streaming", label: "Streaming response" },
+      critic: null
     }
   }
 };
