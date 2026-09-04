@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 
-from src.pipelines.events import AgentName, PipelineEvent, PipelineResult
+from research_assistant.pipelines.events import AgentName, PipelineEvent, PipelineResult
 
 SearchStage = Callable[[str], Awaitable[str]]
 ReaderStage = Callable[[str, str], Awaitable[str]]
@@ -57,7 +57,7 @@ def _status(agent: AgentName, status: str) -> PipelineEvent:
 
 def _default_dependencies() -> PipelineDependencies:
     """Create production stage runners lazily to avoid credential work on import."""
-    from src.agents.agents import (
+    from research_assistant.agents.agents import (
         build_critic_chain,
         build_reader_agent,
         build_search_agent,

@@ -31,8 +31,8 @@ def test_agent_builder_return_types_resolve(
         "init_chat_model",
         lambda **kwargs: fake_model,
     )
-    sys.modules.pop("src.agents.agents", None)
-    agents = importlib.import_module("src.agents.agents")
+    sys.modules.pop("research_assistant.agents.agents", None)
+    agents = importlib.import_module("research_assistant.agents.agents")
 
     try:
         for builder in (agents.build_search_agent, agents.build_reader_agent):
@@ -47,4 +47,4 @@ def test_agent_builder_return_types_resolve(
                 OutputAgentState[Any],
             )
     finally:
-        sys.modules.pop("src.agents.agents", None)
+        sys.modules.pop("research_assistant.agents.agents", None)

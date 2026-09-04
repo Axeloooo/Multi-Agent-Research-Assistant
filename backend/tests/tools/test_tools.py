@@ -2,7 +2,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.tools import tools
+from research_assistant.tools import tools
 
 
 def _response(html: str = "<html><body></body></html>") -> Mock:

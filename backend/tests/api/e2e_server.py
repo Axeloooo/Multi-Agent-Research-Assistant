@@ -5,8 +5,8 @@ from collections.abc import AsyncIterator
 
 import uvicorn
 
-from src.api.app import create_app
-from src.pipelines.events import PipelineEvent
+from research_assistant.api.app import create_app
+from research_assistant.pipelines.events import PipelineEvent
 
 
 async def fake_pipeline(

@@ -10,9 +10,13 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
 
-from src.api.registry import PipelineFactory, RunRegistry, TERMINAL_STATUSES
-from src.pipelines.events import PipelineEvent
-from src.pipelines.pipeline import stream_research_pipeline
+from research_assistant.api.registry import (
+    PipelineFactory,
+    RunRegistry,
+    TERMINAL_STATUSES,
+)
+from research_assistant.pipelines.events import PipelineEvent
+from research_assistant.pipelines.pipeline import stream_research_pipeline
 
 
 class StartRunRequest(BaseModel):
@@ -132,7 +136,7 @@ def create_app(pipeline_factory: PipelineFactory = _default_pipeline) -> FastAPI
     async def download_json(run_id: str) -> JSONResponse:
         return JSONResponse(_completed_snapshot(registry, run_id))
 
-    frontend_dist = Path("frontend/dist")
+    frontend_dist = Path(__file__).parents[4] / "frontend/dist"
     if frontend_dist.is_dir():
         from fastapi.staticfiles import StaticFiles
 

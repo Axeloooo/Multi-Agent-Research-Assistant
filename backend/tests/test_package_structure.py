@@ -9,9 +9,11 @@ def test_importing_main_does_not_run_pipeline(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
-    fake_pipeline = ModuleType("src.pipelines.pipeline")
+    fake_pipeline = ModuleType("research_assistant.pipelines.pipeline")
     fake_pipeline.run_research_pipeline = lambda topic: calls.append(topic)
-    monkeypatch.setitem(sys.modules, "src.pipelines.pipeline", fake_pipeline)
+    monkeypatch.setitem(
+        sys.modules, "research_assistant.pipelines.pipeline", fake_pipeline
+    )
     sys.modules.pop("main", None)
 
     try:
@@ -25,11 +27,11 @@ def test_importing_main_does_not_run_pipeline(
 @pytest.mark.parametrize(
     "module_name",
     [
-        "src",
-        "src.agents",
-        "src.pipelines",
-        "src.tools",
-        "src.tools.tools",
+        "research_assistant",
+        "research_assistant.agents",
+        "research_assistant.pipelines",
+        "research_assistant.tools",
+        "research_assistant.tools.tools",
     ],
 )
 def test_project_module_imports(module_name: str) -> None:
