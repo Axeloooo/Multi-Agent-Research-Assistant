@@ -22,7 +22,7 @@ cd Multi-Agent-Research-Assistant
 git remote add upstream https://github.com/Axeloooo/Multi-Agent-Research-Assistant.git
 ```
 
-Create the project environment:
+Create the project and frontend environments:
 
 ```zsh
 pyenv install
@@ -30,6 +30,9 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements-dev.txt
+cd frontend
+npm install
+cd ..
 cp .env.example .env
 ```
 
@@ -75,9 +78,21 @@ Run the full local quality gate before pushing:
 black --check .
 flake8 .
 pytest
+
+cd frontend
+npm run format
+npm run lint
+npm test
+npm run build
+npm run build-storybook
 ```
 
-To apply the formatter, run `black .` and repeat the checks.
+Run `npx playwright install chromium` once, then use `npm run test:e2e` for the
+offline browser test. It starts a real local FastAPI API with a deterministic
+fake pipeline; it never uses provider credentials or the network.
+
+Apply formatters with `black .` and `cd frontend && npm run format:write`, then
+repeat the checks.
 
 ## Pull request checklist
 
@@ -88,6 +103,8 @@ Before requesting review, confirm that:
 - [ ] New or changed behavior is covered by tests.
 - [ ] Tests do not use live network calls or real credentials.
 - [ ] Black, Flake8, and pytest pass locally.
+- [ ] Prettier, ESLint, Vitest, the frontend build, and Storybook pass locally.
+- [ ] Playwright passes for UI or API streaming changes.
 - [ ] Coverage remains at or above 80% for `src`.
 - [ ] User-facing documentation is accurate.
 - [ ] The pull request explains the change and how it was verified.
