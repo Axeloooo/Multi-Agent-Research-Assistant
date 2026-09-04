@@ -16,6 +16,12 @@ PipelineFactory = Callable[[str, asyncio.Event], AsyncIterator[PipelineEvent]]
 AGENTS: tuple[AgentName, ...] = ("search", "reader", "writer", "critic")
 TERMINAL_STATUSES = frozenset({"completed", "failed", "cancelled"})
 MAX_TERMINAL_RUNS = 20
+ACTIVITY_LABELS = {
+    "thinking": "Thinking",
+    "using_tool": "Using tool",
+    "observing": "Observing tool result",
+    "streaming": "Streaming response",
+}
 
 
 @dataclass
@@ -30,6 +36,9 @@ class RunRecord:
     )
     summaries: dict[AgentName, str] = field(
         default_factory=lambda: {agent: "" for agent in AGENTS}
+    )
+    activities: dict[AgentName, dict[str, str] | None] = field(
+        default_factory=lambda: {agent: None for agent in AGENTS}
     )
     report: str = ""
     critique: str = ""
@@ -114,6 +123,7 @@ class RunRegistry:
             "topic": record.topic,
             "status": record.status,
             "agents": record.agents,
+            "activities": record.activities,
             "summaries": record.summaries,
             "report": record.report,
             "critique": record.critique,
@@ -180,6 +190,15 @@ class RunRegistry:
                 record.summaries[event.agent] + delta, 2400
             )
             await self._publish(record, event.type, event.agent, {"delta": delta})
+            return
+
+        if event.type == "agent.activity" and event.agent is not None:
+            kind = event.payload.get("kind")
+            label = event.payload.get("label")
+            if isinstance(kind, str) and label == ACTIVITY_LABELS.get(kind):
+                activity = {"kind": kind, "label": label}
+                record.activities[event.agent] = activity
+                await self._publish(record, event.type, event.agent, activity)
             return
 
         if event.type == "report.delta":

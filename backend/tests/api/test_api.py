@@ -19,6 +19,11 @@ def _scripted_pipeline(
             type="agent.status", agent="search", payload={"status": "running"}
         )
         yield PipelineEvent(
+            type="agent.activity",
+            agent="search",
+            payload={"kind": "using_tool", "label": "Using tool"},
+        )
+        yield PipelineEvent(
             type="agent.output.delta",
             agent="search",
             payload={"delta": "A reliable source."},
@@ -89,6 +94,10 @@ def test_api_streams_replayable_safe_events_and_downloads() -> None:
         snapshot = _wait_for_terminal(client, run_id)
         assert snapshot["status"] == "completed"
         assert snapshot["agents"]["critic"] == "completed"
+        assert snapshot["activities"]["search"] == {
+            "kind": "using_tool",
+            "label": "Using tool",
+        }
         assert snapshot["report"] == "Report body"
         assert snapshot["critique"] == "Looks good"
 
@@ -96,6 +105,8 @@ def test_api_streams_replayable_safe_events_and_downloads() -> None:
         assert events.status_code == 200
         assert events.headers["content-type"].startswith("text/event-stream")
         assert "event: run.completed" in events.text
+        assert "event: agent.activity" in events.text
+        assert '"label":"Using tool"' in events.text
         assert "raw tool" not in events.text
 
         replay = client.get(
