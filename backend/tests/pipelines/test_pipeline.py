@@ -120,7 +120,9 @@ def test_stream_research_pipeline_times_out_search_and_skips_later_stages() -> N
         ("critic", "skipped"),
     ]
     assert events[-1].type == "run.failed"
-    assert events[-1].payload == {"message": "Research run failed. Please try again."}
+    assert events[-1].payload == {
+        "message": "Search took longer than expected. Please try again."
+    }
 
 
 def test_stream_research_pipeline_stops_at_cancellation_boundary() -> None:

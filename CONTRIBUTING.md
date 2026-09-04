@@ -32,7 +32,7 @@ python -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt
 cd ../frontend
 npm install
-cd ../backend
+cd ..
 cp .env.example .env
 ```
 

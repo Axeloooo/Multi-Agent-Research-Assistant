@@ -28,7 +28,15 @@ def build_search_agent() -> AgentGraph:
     Returns:
         An agent configured with the web search tool.
     """
-    return create_agent(model="google_genai:gemini-3.5-flash-lite", tools=[web_search])
+    return create_agent(
+        model="google_genai:gemini-3.5-flash-lite",
+        tools=[web_search],
+        system_prompt=(
+            "You are a research search agent. Call web_search exactly once for "
+            "the user's topic, then return a concise summary with the sources. "
+            "Do not call any tool again."
+        ),
+    )
 
 
 def build_reader_agent() -> AgentGraph:
@@ -37,7 +45,15 @@ def build_reader_agent() -> AgentGraph:
     Returns:
         An agent configured with the web scraping tool.
     """
-    return create_agent(model="google_genai:gemini-3.5-flash-lite", tools=[scrape_url])
+    return create_agent(
+        model="google_genai:gemini-3.5-flash-lite",
+        tools=[scrape_url],
+        system_prompt=(
+            "You are a research reader agent. Call scrape_url exactly once for "
+            "the most relevant URL supplied by the user, then summarize the "
+            "retrieved content. Do not call any tool again."
+        ),
+    )
 
 
 writer_prompt: ChatPromptTemplate = ChatPromptTemplate.from_messages(

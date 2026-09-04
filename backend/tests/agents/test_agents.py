@@ -20,11 +20,12 @@ def test_agent_builder_return_types_resolve(
 ) -> None:
     fake_agent = object()
     fake_model = RunnableLambda(lambda value: value)
+    agent_options: list[dict[str, object]] = []
     monkeypatch.setattr(dotenv, "load_dotenv", lambda: False)
     monkeypatch.setattr(
         langchain.agents,
         "create_agent",
-        lambda **kwargs: fake_agent,
+        lambda **kwargs: agent_options.append(kwargs) or fake_agent,
     )
     monkeypatch.setattr(
         langchain.chat_models,
@@ -46,5 +47,7 @@ def test_agent_builder_return_types_resolve(
                 InputAgentState,
                 OutputAgentState[Any],
             )
+        assert "web_search exactly once" in str(agent_options[0]["system_prompt"])
+        assert "scrape_url exactly once" in str(agent_options[1]["system_prompt"])
     finally:
         sys.modules.pop("src.agents.agents", None)

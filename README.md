@@ -90,9 +90,11 @@ python -m venv .venv
 
 cd ../frontend
 npm install
-cd ../backend
 
+cd ..
 cp .env.example .env
+
+cd backend
 ```
 
 Add credentials only to your uncommitted `.env` when manually testing live

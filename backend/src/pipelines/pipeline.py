@@ -361,6 +361,19 @@ async def stream_research_pipeline(
             for agent in AGENTS[AGENTS.index(current_agent) + 1 :]:
                 yield _status(agent, "skipped")
         yield PipelineEvent(type="run.cancelled", agent=None, payload={})
+    except PipelineStageTimedOut:
+        if current_agent is not None:
+            yield _status(current_agent, "failed")
+            for agent in AGENTS[AGENTS.index(current_agent) + 1 :]:
+                yield _status(agent, "skipped")
+        agent_label = current_agent.title() if current_agent is not None else "Research"
+        yield PipelineEvent(
+            type="run.failed",
+            agent=current_agent,
+            payload={
+                "message": f"{agent_label} took longer than expected. Please try again."
+            },
+        )
     except Exception:
         if current_agent is not None:
             yield _status(current_agent, "failed")
