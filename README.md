@@ -2,26 +2,27 @@
 
 # Multi-Agent Research Assistant
 
-**A pre-alpha research command center that streams a Search → Reader → Writer → Critic workflow to a local web UI.**
+**A Beta, local-first research command center that streams a Search → Reader → Writer → Critic workflow to a polished web UI.**
 
 [![CI](https://github.com/Axeloooo/Multi-Agent-Research-Assistant/actions/workflows/ci.yaml/badge.svg?branch=devel)](https://github.com/Axeloooo/Multi-Agent-Research-Assistant/actions/workflows/ci.yaml)
 [![Python 3.14.7](https://img.shields.io/badge/python-3.14.7-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Node 22+](https://img.shields.io/badge/node-22%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![Status: Pre--alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#project-status)
+[![Status: Beta](https://img.shields.io/badge/status-beta-0ea5e9.svg)](#project-status)
 
 </div>
 
 > [!IMPORTANT]
-> This project is pre-alpha. The local command center, typed streaming pipeline,
-> and offline test harness are implemented; live research still requires valid
-> Gemini and Tavily credentials and provider configuration.
+> This is a Beta local application. Its command center, typed streaming runtime,
+> safe live agent-activity feed, and offline test harness are implemented. Live
+> research requires valid Gemini and Tavily credentials and provider setup.
 
 ## Overview
 
 Enter a focused question in the browser and watch four agents advance through a
-single research run. The UI shows safe per-agent summaries, streams the report
-and critique as they arrive, supports cancellation, and offers Markdown and
-JSON downloads once the run completes.
+single research run. The UI shows safe per-agent summaries and fixed, live
+activity labels such as “Thinking”, “Using tool”, and “Streaming response”. It
+streams the report and critique as they arrive, supports cancellation, and
+offers Markdown and JSON downloads once the run completes.
 
 The application is intentionally local and process-scoped: it retains up to 20
 completed runs in memory, runs one job at a time, and loses run history when the
@@ -45,7 +46,7 @@ flowchart LR
 | --- | --- |
 | Tavily search and multi-strategy extraction adapters | Implemented and unit tested |
 | Gemini Search, Reader, Writer, and Critic construction | Implemented; requires local credentials for live use |
-| Typed async research pipeline | Implemented and unit tested |
+| Typed async research pipeline with bounded stage deadlines | Implemented and unit tested |
 | FastAPI run queue, status snapshots, cancellation, and SSE replay | Implemented and unit tested |
 | React + Vite + Tailwind command center | Implemented |
 | Storybook, Vitest/RTL, and Playwright E2E coverage | Implemented; default tests use no live providers |
@@ -53,17 +54,24 @@ flowchart LR
 
 ## Architecture and safety
 
-- `src/tools/` contains provider and extraction adapters.
-- `src/agents/` constructs agent prompts and chains.
-- `src/pipelines/` owns typed stage sequencing and provider-neutral events.
-- `src/api/` turns safe pipeline events into REST, SSE, snapshots, cancellation,
+- `backend/src/research_assistant/tools/` contains provider and extraction adapters.
+- `backend/src/research_assistant/agents/` constructs agent prompts and chains.
+- `backend/src/research_assistant/pipelines/` owns typed stage sequencing and
+  provider-neutral events.
+- `backend/src/research_assistant/api/` turns safe pipeline events into REST,
+  SSE, snapshots, cancellation,
   and downloads.
 - `frontend/` is the Vite TypeScript application.
+- `backend/tests/{agents,api,pipelines,tools}/` and
+  `frontend/tests/{unit,e2e}/` mirror the runtime boundaries.
 
 The browser never receives raw tool calls, provider metadata, chain reasoning,
 or raw exceptions. It receives bounded agent summaries, report/critique deltas,
-and concise safe errors. Disconnecting a browser does not cancel a run; use the
-explicit Cancel research action instead.
+and a fixed allowlist of activity labels. Search and Reader have 45-second
+deadlines, Writer has a 90-second deadline, Critic has a 45-second deadline,
+and Tavily requests time out after 30 seconds. A failed stage produces a safe
+terminal error and skips later stages. Disconnecting a browser does not cancel a
+run; use the explicit Cancel research action instead.
 
 ## Local setup
 
@@ -74,14 +82,15 @@ Prerequisites: Git, Python 3.14.7 (managed by `pyenv`), Node.js 22.13+ and npm
 git clone https://github.com/Axeloooo/Multi-Agent-Research-Assistant.git
 cd Multi-Agent-Research-Assistant
 
+cd backend
 pyenv install
 python -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements-dev.txt
 
-cd frontend
+cd ../frontend
 npm install
-cd ..
+cd ../backend
 
 cp .env.example .env
 ```
@@ -99,8 +108,8 @@ TAVILY_API_KEY=your_tavily_api_key
 For local development, start the API and frontend in separate terminals:
 
 ```zsh
-# Terminal 1, repository root
-.venv/bin/uvicorn src.api.app:create_app --factory --reload --port 8000
+# Terminal 1, backend/
+.venv/bin/uvicorn research_assistant.api.app:create_app --factory --reload --port 8000
 
 # Terminal 2
 cd frontend
@@ -114,10 +123,12 @@ run `npm run build`; FastAPI serves `frontend/dist` when it exists.
 ## Development and tests
 
 Python quality gates remain Black and Flake8. Frontend source uses ESLint and
-Prettier. The Python suite requires at least 80% line coverage across `src`.
+Prettier. The Python suite requires at least 80% line coverage across
+`backend/src/research_assistant`.
 
 ```zsh
-# Repository root
+# Backend
+cd backend
 .venv/bin/black --check .
 .venv/bin/flake8 .
 .venv/bin/pytest
@@ -140,7 +151,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The CI workflow runs the Python checks, frontend format/lint/unit/build/
+The CI workflow runs the backend checks, frontend format/lint/unit/build/
 Storybook checks, then the browser test. No default test makes live provider or
 network calls.
 

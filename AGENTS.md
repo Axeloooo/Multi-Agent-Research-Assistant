@@ -2,41 +2,47 @@
 
 ## Repository context
 
-Multi-Agent Research Assistant is a pre-alpha Python project for a planned
-Gemini- and Tavily-powered research workflow. Do not describe planned behavior
-as implemented. The intended stages are Search, Reader, Writer, and Critic,
-with future CLI and Streamlit interfaces.
+Multi-Agent Research Assistant is a Beta, local-first Gemini- and
+Tavily-powered research workflow. Search, Reader, Writer, and Critic run
+through a typed backend and stream safe status, activity, and output updates to
+the frontend. Do not describe planned work such as durable storage,
+authentication, citations, or evaluations as implemented.
 
 ## Architecture boundaries
 
-- Keep external retrieval and extraction adapters in `src/tools/`.
-- Keep agent construction and prompts in `src/agents/`.
-- Keep cross-agent sequencing and state in `src/pipelines/`.
-- Keep CLI and UI entry points thin; business logic belongs under `src/`.
+- Keep external retrieval and extraction adapters in
+  `backend/src/research_assistant/tools/`.
+- Keep agent construction and prompts in `backend/src/research_assistant/agents/`.
+- Keep cross-agent sequencing and state in
+  `backend/src/research_assistant/pipelines/`.
+- Keep API entry points thin; backend logic belongs under
+  `backend/src/research_assistant/` and UI logic under `frontend/src/`.
+- Keep backend tests in `backend/tests/{agents,api,pipelines,tools}/` and
+  frontend tests in `frontend/tests/{unit,e2e}/`.
 - Prefer small, typed interfaces over shared mutable state.
 
 ## Setup and verification
 
-Use Python 3.14.7 from `.python-version` and the repository virtual
+Use Python 3.14.7 from `backend/.python-version` and the backend virtual
 environment:
 
 ```zsh
+cd backend
 python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-dev.txt
+.venv/bin/python -m pip install -r requirements-dev.txt
 ```
 
 Before declaring work complete, run:
 
 ```zsh
-black --check .
-flake8 .
-pytest
+cd backend && .venv/bin/black --check .
+cd backend && .venv/bin/flake8 .
+cd backend && .venv/bin/pytest
 ```
 
 Black is the only formatter. Flake8 is the linter. Do not introduce Ruff,
 isort, uv, or a lockfile without an approved tooling change. Maintain at least
-80% line coverage across `src`.
+80% line coverage across `backend/src/research_assistant`.
 
 ## Change discipline
 
@@ -59,7 +65,8 @@ isort, uv, or a lockfile without an approved tooling change. Maintain at least
 
 ## Git workflow
 
-- Contributor branches start from and merge into `devel`.
+- Contributor branches start from and merge into `devel`; use `feature/` or
+  `fix/` branch prefixes.
 - Maintainers promote reviewed changes from `devel` to `main`.
 - Use Conventional Commit prefixes so semantic-release can classify changes.
 - Do not push, merge, publish, or create releases without explicit approval.
